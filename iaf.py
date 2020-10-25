@@ -1,12 +1,12 @@
 import numpy as np
 import scipy
+import helpers
 
-def iaf_encode(u, dt, alpha, d, dte=0.0, y=0.0, quad_method='trapz', full_output=False):
+def IAF_encode(u, dt, alpha, theta, dte=0.0, quad_method='rect'):
     """
-    ASDM time encoding machine.
+    Integrate-And-Fire sampler.
 
-    Encode a finite length signal using an Asynchronous Sigma-Delta
-    Modulator.
+    Encode a finite length signal using an Integrate-And-Fire sampler (FREICHTINGER-2009).
 
     Parameters
     ----------
@@ -15,37 +15,24 @@ def iaf_encode(u, dt, alpha, d, dte=0.0, y=0.0, quad_method='trapz', full_output
     dt : float
         Sampling resolution of input signal; the sampling frequency
         is 1/dt Hz.
-    b : float
-        Encoder bias.
-    d : float
-        Encoder threshold.
-    k : float
-        Encoder integration constant.
+    alpha : float
+        Firing parameter.
+    theta : float
+        Threshold.
     dte : float
         Sampling resolution assumed by the encoder (s).
         This may not exceed `dt`.
-    y : float
-        Initial value of integrator.
-    interval : float
-        Time since last spike (in s).
-    sgn : {+1, -1}
-        Sign of integrator.
     quad_method : {'rect', 'trapz'}
         Quadrature method to use (rectangular or trapezoidal).
-    full_output : bool
-        If set, the function returns the encoded data block followed
-        by the given parameters (with updated values for `y`, `interval`, and
-        `sgn`). This is useful when the function is called repeatedly to
-        encode a long signal.
 
     Returns
     -------
     s : ndarray of floats
-        If `full_output` == False, returns the signal encoded as an
-        array of time intervals between spikes.
-    s, dt, b, d, k, dte, y, interval, sgn, quad_method, full_output : tuple
-        If `full_output` == True, returns the encoded signal
-        followed by updated encoder parameters.
+        Indices of spiking times in the time array
+    ys : ndarray of floats
+        Integral signal.
+    q_signs : ndarray of floats
+        Signs of spikes.
 
     Notes
     -----
@@ -55,11 +42,7 @@ def iaf_encode(u, dt, alpha, d, dte=0.0, y=0.0, quad_method='trapz', full_output
 
     Nu = len(u)
     if Nu == 0:
-        if full_output:
-            return np.array((), np.float), dt, alpha, d, dte, y, \
-               quad_method, full_output
-        else:
-            return np.array((), np.float)
+        return np.array((), np.float)
 
     # Check whether the encoding resolution is finer than that of the
     # original sampled signal:
@@ -68,7 +51,6 @@ def iaf_encode(u, dt, alpha, d, dte=0.0, y=0.0, quad_method='trapz', full_output
     if dte < 0:
         raise ValueError('encoding time resolution must be nonnegative')
     if dte != 0 and dte != dt:
-
         # Resample signal and adjust signal length accordingly:
         M = int(dt/dte)
         u = scipy.signal.resample(u, len(u)*M)
@@ -78,6 +60,8 @@ def iaf_encode(u, dt, alpha, d, dte=0.0, y=0.0, quad_method='trapz', full_output
     # Use a list rather than an array to save the spike intervals
     # because the number of spikes is not fixed:
     s = []
+    ys = []
+    q_signs = []
 
     # Choose integration method and set the number of points over
     # which to integrate the input (see note above). This allows the
@@ -91,21 +75,76 @@ def iaf_encode(u, dt, alpha, d, dte=0.0, y=0.0, quad_method='trapz', full_output
         last = Nu-1
     else:
         raise ValueError('unrecognized quadrature method')
-
-    ys = []
-    qs = []
-        
+      
+    y = 0
     for i in range(last):
         y = compute_y(y, i)
         ys.append(y)
-        if np.abs(y) >= d:
+        if np.abs(y) >= theta:
             s.append(i)
-            qs.append(np.sign(y))
+            q_signs.append(np.sign(y))
             y = 0
             
+    return np.array(s), np.array(ys), np.array(q_signs)
+    
+def IAF_decode(z, q_signs, t, alpha, theta, psi_kernel):
+    """
+    Integrate-And-Fire decoder.
 
-    if full_output:
-        return np.array(s), dt, alpha, d, dte, y, \
-               quad_method, full_output
-    else:
-        return np.array(s), np.array(ys), np.array(qs)
+    Decode a signal encoded with a Integrate-And-Fire sampler.
+
+    Parameters
+    ----------
+    z : array_like of floats
+        Spike indices.
+    q_signs : array_like of floats
+        Signs of spikes.
+    t : array_like of float
+        Sampling times.
+    alpha : float
+        Firing parameter.
+    theta : float
+        Encoder threshold.
+    psi_kernel : array_like of floats
+        Signal of the PSI kernel used for decoding. Centered around zero (TO BE REVIEWED)
+
+    Returns
+    -------
+    u_rec : ndarray of floats
+        Recovered signal.
+    """
+    scaled_qs = q_signs * theta
+
+    # Wis
+    # To be optimized
+    ws = []
+    ws.append(0)
+    for idx, value in enumerate(scaled_qs[1:]):
+        w = np.exp(alpha * (t[int(z[idx])] - t[int(z[idx+1])])) * ws[idx] + value
+        ws.append(w)
+    
+    # Sk
+    # To be optimized
+    sk = []
+    nb = 0
+    for idx, value in enumerate(t):
+        if(nb == 0):
+            s = 0
+
+        s = np.exp(alpha * (t[int(z[nb])] - value)) * ws[nb]
+
+        if(nb+1 < z.shape[0]):
+            if(idx == int(z[nb+1])):
+                nb = nb+1
+
+        sk.append(s)
+    
+    # Applying the right filter
+    # To be optimized
+    dt = t[1] - t[0]
+    phi_kernel = helpers.get_phi_from_psi(psi_kernel, t, dt, alpha)
+    convolved = np.convolve(phi_kernel, sk)
+    filtered = convolved[int(len(t)/2): -int(len(t)/2)+1]
+    
+    return filtered, sk
+    

@@ -3,13 +3,11 @@ import scipy
 
 __pinv_rcond__ = 1e-8
 
-def asdm_encode(u, dt, b, d, k=1.0, dte=0.0, y=0.0, interval=0.0,
-                sgn=1, quad_method='trapz', full_output=False):
+def TEM_encode(u, dt, b, delta, k, dte=0.0, sgn=-1, quad_method='rect'):
     """
-    ASDM time encoding machine.
+    Time encoding machine.
 
-    Encode a finite length signal using an Asynchronous Sigma-Delta
-    Modulator.
+    Encode a finite length signal using an Time Encoding Machine (LAZAR 2003).
 
     Parameters
     ----------
@@ -20,35 +18,26 @@ def asdm_encode(u, dt, b, d, k=1.0, dte=0.0, y=0.0, interval=0.0,
         is 1/dt Hz.
     b : float
         Encoder bias.
-    d : float
+    delta : float
         Encoder threshold.
     k : float
         Encoder integration constant.
     dte : float
         Sampling resolution assumed by the encoder (s).
         This may not exceed `dt`.
-    y : float
-        Initial value of integrator.
-    interval : float
-        Time since last spike (in s).
     sgn : {+1, -1}
         Sign of integrator.
     quad_method : {'rect', 'trapz'}
         Quadrature method to use (rectangular or trapezoidal).
-    full_output : bool
-        If set, the function returns the encoded data block followed
-        by the given parameters (with updated values for `y`, `interval`, and
-        `sgn`). This is useful when the function is called repeatedly to
-        encode a long signal.
 
     Returns
     -------
     s : ndarray of floats
-        If `full_output` == False, returns the signal encoded as an
-        array of time intervals between spikes.
-    s, dt, b, d, k, dte, y, interval, sgn, quad_method, full_output : tuple
-        If `full_output` == True, returns the encoded signal
-        followed by updated encoder parameters.
+        Encoded signal. The values represent the time between spikes (in s).
+    ys : ndarray of floats
+        Integral signal.
+    zs : ndarray of floats
+        z signal.
 
     Notes
     -----
@@ -58,11 +47,7 @@ def asdm_encode(u, dt, b, d, k=1.0, dte=0.0, y=0.0, interval=0.0,
 
     Nu = len(u)
     if Nu == 0:
-        if full_output:
-            return np.array((), np.float), dt, b, d, k, dte, y, interval, sgn, \
-               quad_method, full_output
-        else:
-            return np.array((), np.float)
+        return np.array((), np.float)
 
     # Check whether the encoding resolution is finer than that of the
     # original sampled signal:
@@ -81,6 +66,8 @@ def asdm_encode(u, dt, b, d, k=1.0, dte=0.0, y=0.0, interval=0.0,
     # Use a list rather than an array to save the spike intervals
     # because the number of spikes is not fixed:
     s = []
+    ys = []
+    zs = []
 
     # Choose integration method and set the number of points over
     # which to integrate the input (see note above). This allows the
@@ -94,32 +81,27 @@ def asdm_encode(u, dt, b, d, k=1.0, dte=0.0, y=0.0, interval=0.0,
         last = Nu-1
     else:
         raise ValueError('unrecognized quadrature method')
-
-    ys = []
-    zs = []
-        
+    
+    y = 0
+    interval = 0
     for i in range(last):
         y = compute_y(y, sgn, i)
         interval += dt
         zs.append(sgn*b)
         ys.append(y)
-        if np.abs(y) >= d:
+        if np.abs(y) >= delta:
             s.append(interval)
             interval = 0.0
-            y = d*sgn
+            y = delta*sgn
             sgn = -sgn
 
-    if full_output:
-        return np.array(s), dt, b, d, k, dte, y, interval, sgn, \
-               quad_method, full_output
-    else:
-        return np.array(s), np.array(ys), np.array(zs)
+    return np.array(s), np.array(ys), np.array(zs)
     
-def asdm_decode(s, dur, dt, bw, b, d, k=1.0, sgn=-1):
+def TEM_decode(s, dur, dt, bw, b, d, k, sgn=1):
     """
-    ASDM time decoding machine.
+    Time decoding machine.
 
-    Decode a signal encoded with an Asynchronous Sigma-Delta Modulator.
+    Decode a signal encoded with a Time Encoding Machine.
 
     Parameters
     ----------

@@ -1,8 +1,47 @@
 import time
 from numpy import array, ceil, complex, exp, pi, zeros
 from numpy.random import rand, randint, randn
-from numpy.fft import irfft
+from numpy.fft import irfft, fft, fftfreq, fftshift, ifft
 from scipy.signal import firwin, lfilter
+import numpy as np
+import scipy
+
+def get_spike_signal(z, qs, N, theta):
+    """
+    To be optimized
+    """
+    minus_ones = np.where(qs==-1)
+    ones = np.where(qs==1)
+    minus_ones_idx = z[minus_ones]
+    ones_idx = z[ones]
+    minus_impulse = scipy.signal.unit_impulse(N, minus_ones_idx) * -1
+    ones_impulse = scipy.signal.unit_impulse(N, ones_idx)
+    impulses = minus_impulse + ones_impulse
+    impulses = impulses * theta
+    
+    return impulses
+
+def rcosfilter(N, gamma, Ts, Fs):
+    """
+    To be optimized
+    """
+    t = (np.arange(N) - N / 2) / Fs
+
+    return np.where(np.abs(2*t) == Ts / gamma,
+        np.pi / 4 * np.sinc(t/Ts),
+        np.sinc(t/Ts) * np.cos(np.pi*gamma*t/Ts) / (1 - (2*gamma*t/Ts) ** 2))
+
+def get_phi_from_psi(psi_kernel, t, dt, alpha):
+    """
+    To be optimized
+    """
+    fft_psi = fft(psi_kernel)
+    fft_xf = fftfreq(len(t), dt)
+    
+    fft_phi = (2*np.pi*fft_xf*1j + alpha) * fft_psi
+    phi = ifft(fft_phi)
+    
+    return phi
 
 def func_timer(f):
     """
