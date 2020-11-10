@@ -21,45 +21,41 @@ def get_spike_signal(z, qs, N, theta):
     
     return impulses
 
-def rcosfilter(N, gamma, Ts, Fs):
+def rcosfilter(t, gamma, Ts):
     """
     To be optimized
     """
-    t = (np.arange(N) - N / 2) / Fs
+    return np.sinc(t/Ts) * np.cos(np.pi*gamma*t/Ts) / (1 - (2*gamma*t/Ts) ** 2)
 
-    return np.where(np.abs(2*t) == Ts / gamma,
-        np.pi / 4 * np.sinc(t/Ts),
-        np.sinc(t/Ts) * np.cos(np.pi*gamma*t/Ts) / (1 - (2*gamma*t/Ts) ** 2))
+def derivative_rcosfilter(t, gamma, Ts):
+    a = np.sinc(t/Ts)
+    a_prime = (np.cos(np.pi * t / Ts) - np.sinc(t/Ts)) / t
+    
+    b = np.cos(np.pi * gamma * t / Ts)
+    b_prime = - (np.pi * gamma / Ts) * np.sin(np.pi * gamma * t / Ts)
+    
+    c = 1 / (1 - (2*gamma*t/Ts) ** 2)
+    c_prime = (8 * ((Ts * gamma) **2) * t) / ((Ts**2 - (2*gamma*t) ** 2) **2)
+    
+    return a * b * c_prime + a * b_prime * c + a_prime * b * c
 
-def get_phi_from_psi(psi_kernel, t, dt, alpha):
+def closed_phi_from_rcos(t, gamma, Ts, alpha):
+    """
+    To be optimized
+    """
+    return derivative_rcosfilter(t, gamma, Ts) + alpha * rcosfilter(t, gamma, Ts) 
+
+def get_phi_from_psi(psi_kernel, N, dt, alpha):
     """
     To be optimized
     """
     fft_psi = fft(psi_kernel)
-    fft_xf = fftfreq(len(t), dt)
+    fft_xf = fftfreq(N, dt)
     
     fft_phi = (2*np.pi*fft_xf*1j + alpha) * fft_psi
     phi = ifft(fft_phi)
     
     return phi
-
-def func_timer(f):
-    """
-    Time the execution of a function.
-
-    Parameters
-    ----------
-    f : function
-        Function to time.
-    """
-
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        res = f(*args, **kwargs)
-        stop = time.time()
-        print ('execution time = %.5f s' % (stop-start))
-        return res
-    return wrapper
 
 
 def gen_band_limited(dur, dt, fmax, np=None, nc=3):

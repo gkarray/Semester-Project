@@ -87,7 +87,7 @@ def IAF_encode(u, dt, alpha, theta, dte=0.0, quad_method='rect'):
             
     return np.array(s), np.array(ys), np.array(q_signs)
     
-def IAF_decode(z, q_signs, t, alpha, theta, psi_kernel):
+def IAF_decode(z, q_signs, t, alpha, theta, psi_kernel, phi_kernel=None):
     """
     Integrate-And-Fire decoder.
 
@@ -130,8 +130,8 @@ def IAF_decode(z, q_signs, t, alpha, theta, psi_kernel):
     for idx, value in enumerate(t):
         if(nb == 0):
             s = 0
-
-        s = np.exp(alpha * (t[int(z[nb])] - value)) * ws[nb]
+        else:
+            s = np.exp(alpha * (t[int(z[nb])] - value)) * ws[nb]
 
         if(nb+1 < z.shape[0]):
             if(idx == int(z[nb+1])):
@@ -141,8 +141,11 @@ def IAF_decode(z, q_signs, t, alpha, theta, psi_kernel):
     
     # Applying the right filter
     # To be optimized
-    dt = t[1] - t[0]
-    phi_kernel = helpers.get_phi_from_psi(psi_kernel, t, dt, alpha)
+    if(phi_kernel is None):
+        dt = t[1] - t[0]
+        N = len(t)
+        phi_kernel = helpers.get_phi_from_psi(psi_kernel, N, dt, alpha)
+    
     convolved = np.convolve(phi_kernel, sk)
     filtered = convolved[int(len(t)/2): -int(len(t)/2)+1]
     
