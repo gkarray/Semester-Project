@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 import helpers
 
-def IAF_encode(u, dt, alpha, theta, dte=0.0, quad_method='rect'):
+def IAF_encode(u, dt, alpha, theta, t,  dte=0.0, quad_method='rect'):
     """
     Integrate-And-Fire sampler.
 
@@ -62,26 +62,34 @@ def IAF_encode(u, dt, alpha, theta, dte=0.0, quad_method='rect'):
     s = []
     ys = []
     q_signs = []
+    
+    def quad(y, i, tj):
+        return y + dt*u[i]*np.exp((tj - t[i])/alpha)
+    
+    def trapz(y, i):
+        return y + dt*np.exp(alpha*dt)*(u[i]+u[i+1])/2.0
 
     # Choose integration method and set the number of points over
     # which to integrate the input (see note above). This allows the
     # use of one loop below to perform the integration regardless of
     # the method chosen:
     if quad_method == 'rect':
-        compute_y = lambda y, i: y + dt*u[i]*np.exp(alpha*dt)
+        compute_y = quad
         last = Nu
     elif quad_method == 'trapz':
-        compute_y = lambda y, i : y + dt*np.exp(alpha*dt)*(u[i]+u[i+1])/2.0
+        compute_y = trapz
         last = Nu-1
     else:
         raise ValueError('unrecognized quadrature method')
       
     y = 0
+    tj = 0
     for i in range(last):
-        y = compute_y(y, i)
+        y = compute_y(y, i, tj)
         ys.append(y)
         if np.abs(y) >= theta:
             s.append(i)
+            tj = t[i]
             q_signs.append(np.sign(y))
             y = 0
             
@@ -119,8 +127,11 @@ def IAF_decode(z, q_signs, t, alpha, theta, psi_kernel, phi_kernel=None):
     # To be optimized
     ws = []
     ws.append(0)
-    for idx, value in enumerate(scaled_qs[1:]):
-        w = np.exp(alpha * (t[int(z[idx])] - t[int(z[idx+1])])) * ws[idx] + value
+    for idx, value in enumerate(scaled_qs):
+        if(idx == 0):
+            continue
+            
+        w = np.exp(alpha * (t[int(z[idx-1])] - t[int(z[idx])])) * ws[idx-1] + value
         ws.append(w)
     
     # Sk
