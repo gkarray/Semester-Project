@@ -6,28 +6,28 @@ from scipy.signal import firwin, lfilter
 import numpy as np
 import scipy
 
-def get_spike_signal(z, qs, N, theta):
-    """
-    To be optimized
-    """
-    minus_ones = np.where(qs==-1)
-    ones = np.where(qs==1)
-    minus_ones_idx = z[minus_ones]
-    ones_idx = z[ones]
+def getSpikesSignal(spikes_idx, spikes_sgns, spikes_amplitude, N):
+    minus_ones = np.where(spikes_sgns == -1)
+    ones = np.where(spikes_sgns == 1)
+    
+    minus_ones_idx = spikes_idx[minus_ones]
+    ones_idx = spikes_idx[ones]
+    
     minus_impulse = scipy.signal.unit_impulse(N, minus_ones_idx) * -1
     ones_impulse = scipy.signal.unit_impulse(N, ones_idx)
+    
     impulses = minus_impulse + ones_impulse
-    impulses = impulses * theta
+    impulses = impulses * spikes_amplitude
     
     return impulses
 
-def rcosfilter(t, gamma, Ts):
+def rcosFilter(t, gamma, Ts):
     """
     To be optimized
     """
     return np.sinc(t/Ts) * np.cos(np.pi*gamma*t/Ts) / (1 - (2*gamma*t/Ts) ** 2)
 
-def derivative_rcosfilter(t, gamma, Ts):
+def derivativeRcosFilter(t, gamma, Ts):
     a = np.sinc(t/Ts)
     a_prime = (np.cos(np.pi * t / Ts) - np.sinc(t/Ts)) / t
     
@@ -39,20 +39,20 @@ def derivative_rcosfilter(t, gamma, Ts):
     
     return a * b * c_prime + a * b_prime * c + a_prime * b * c
 
-def closed_phi_from_rcos(t, gamma, Ts, alpha):
+def closedPhiFromRcos(t, gamma, Ts, alpha):
     """
     To be optimized
     """
-    return derivative_rcosfilter(t, gamma, Ts) + alpha * rcosfilter(t, gamma, Ts) 
+    return derivativeRcosFilter(t, gamma, Ts) + alpha * rcosFilter(t, gamma, Ts) 
 
-def get_phi_from_psi(psi_kernel, N, dt, alpha):
+def getPhiFromPsi(psi_kernel, N, dt, alpha):
     """
     To be optimized
     """
     fft_psi = fft(psi_kernel)
     fft_xf = fftfreq(N, dt)
     
-    fft_phi = (2*np.pi*fft_xf*1j + alpha) * fft_psi
+    fft_phi = (2 * np.pi * fft_xf * 1j + alpha) * fft_psi
     phi = ifft(fft_phi)
     
     return phi

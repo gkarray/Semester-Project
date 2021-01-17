@@ -3,7 +3,7 @@ import numpy as np
 from scipy.fft import fft, fftfreq, fftshift
 import matplotlib.pyplot as plt
 
-def plot_signal_and_fourier(t, u, dt):
+def plotSignalAndFourier(t, u, dt, fig_title):
     """
     Plot a signal and its fourier transform.
 
@@ -38,11 +38,26 @@ def plot_signal_and_fourier(t, u, dt):
     plt.xlabel('f (Hz)')
     plt.ylabel('|U(f)|')
     plt.grid()
+    
+    plt.title(fig_title)
 
     plt.show()
     
+def plotAny(t, u, fig_title, spikes = False):
+    plt.figure(figsize=(12, 8))
     
-def plot_integral_and_spikes(t, ys, zs, algo):
+    if spikes:
+        plt.stem(t, u)
+    else:
+        plt.plot(t, u)
+    plt.xlabel('t (s)')
+    plt.ylabel('u(t)')
+    plt.title(fig_title)
+    plt.grid()
+    
+    plt.show()
+    
+def plotIntegralAndEncoderOutput(t, y_signal, enc_output, enc_output_label, fig_title):
     """
     Plot the integral signal and the spike signal (z(t) from Lazar's paper, q(t) from Feichtinger's paper)
     in the same plot.
@@ -57,23 +72,16 @@ def plot_integral_and_spikes(t, ys, zs, algo):
         Spike signal.
 
     """
-    plt.figure(figsize=(15, 10))
-    
-    ylabel = 'y(t)'
-    zlabel = ''
-    
-    if(algo == 'lazar'):
-        zlabel = 'z(t)'
-    elif (algo == 'feichtinger'):
-        zlabel = 'q(t)'
+    plt.figure(figsize=(12, 8))
         
-    plt.plot(t, ys, 'r', label=ylabel)
-    plt.plot(t, zs, 'b', label=zlabel)
+    plt.plot(t, y_signal, 'r', label='y(t)')
+    plt.plot(t, enc_output, 'b', label=enc_output_label)
+    plt.title(fig_title)
     plt.legend()
     
     plt.show()
 
-def plot_encoded(t, u, s, fig_title):
+def plotSignalAndSpikes(t, u, s, fig_title):
     """
     Plot a time-encoded signal.
 
@@ -91,7 +99,7 @@ def plot_encoded(t, u, s, fig_title):
     if s[-1] > max(t)-min(t):
         raise ValueError('some spike times occur outside of signal''s support')
         
-    p.figure(figsize=(15,10))
+    p.figure(figsize=(15, 10))
     p.clf()
     p.gcf().canvas.set_window_title(fig_title)
     p.axes([0.125, 0.3, 0.775, 0.6])
@@ -109,7 +117,7 @@ def plot_encoded(t, u, s, fig_title):
     p.gca().set_xlim(min(t), max(t))
     p.draw_if_interactive()
 
-def plot_compare(t, u, v, fig_title):
+def plotSignalAndRecoveredSignal(t, u, v, fig_title):
     """
     Compare two signals and plot the difference between them.
 
@@ -121,10 +129,10 @@ def plot_compare(t, u, v, fig_title):
         Signal samples.
 
     """
-    p.figure(figsize=(15,10))
+    p.figure(figsize=(15, 10))
     p.clf()
     p.gcf().canvas.set_window_title(fig_title)
-    p.subplot(211)
+#     p.subplot(211)
     p.plot(t, u, 'b', label='u(t)')
     p.plot(t, v, 'r', label='u_rec(t)')
     p.xlabel('t (s)')
@@ -132,10 +140,10 @@ def plot_compare(t, u, v, fig_title):
     p.legend()
     p.title(fig_title)
     p.gca().set_xlim(min(t), max(t))
-    p.subplot(212)
-    p.plot(t, 20*np.log10(abs(u-v)))
-    p.xlabel('t (s)')
-    p.ylabel('error (dB)')
-    p.gca().set_xlim(min(t), max(t))
+#     p.subplot(212)
+#     p.plot(t, 20*np.log10(abs(u-v)))
+#     p.xlabel('t (s)')
+#     p.ylabel('error (dB)')
+#     p.gca().set_xlim(min(t), max(t))
     p.draw_if_interactive()
     
