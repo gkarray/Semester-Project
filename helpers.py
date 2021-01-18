@@ -21,6 +21,27 @@ def getSpikesSignal(spikes_idx, spikes_sgns, spikes_amplitude, N):
     
     return impulses
 
+def getESpline(t_0_centered, w_0, l):
+    
+    t_left_first_index = int(len(t_0_centered)/2) - l
+    t_left_last_index = t_left_first_index + int(l/2)
+    
+    t_right_first_index = t_left_last_index
+    t_right_last_index = t_left_first_index + l
+    
+    t_left = t_0_centered[t_left_first_index : t_left_last_index]
+    t_right = t_0_centered[t_right_first_index : t_right_last_index]
+    
+    phi_left = (1/w_0) * np.sin(w_0 * (2 + t_left))
+    phi_right = - (1/w_0) * np.sin(w_0 * t_right) 
+    
+    phi = np.zeros(len(t_0_centered))
+    
+    phi[t_left_first_index : t_left_last_index] = phi_left
+    phi[t_right_first_index : t_right_last_index] = phi_right
+    
+    return phi
+
 def rcosFilter(t, gamma, Ts):
     """
     To be optimized

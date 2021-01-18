@@ -56,7 +56,10 @@ class IAF_KernelBased(Sampler):
             y = self.integrate(y, i, tj)
             y_signal.append(y)
             
+            
             if np.abs(y) >= self.theta:
+                y_signal.pop()
+                y_signal.append(self.theta * np.sign(y))
                 spikes_idx.append(i)
                 tj = self.t[i]
                 q_signs.append(np.sign(y))
@@ -212,7 +215,7 @@ class IAF_KernelBased(Sampler):
             
         fig_title = 'Output of the integrator / Output of the encoder'    
         
-        plotIntegralAndEncoderOutput(self.t, self.y_signal, self.spikes_signal, 'q(t)', fig_title)
+        plotIntegralAndEncoderOutput(self.t, self.y_signal, self.spikes_signal, 'q(t)', fig_title, spikes = True)
         
     def plotPhiKernel(self):
         if self.status < Status.HAS_SIGNAL:

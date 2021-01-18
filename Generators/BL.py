@@ -72,4 +72,4 @@ class BL(Generator):
         
         u = irfft(f,N)
         
-        return u
+        return self.t, u

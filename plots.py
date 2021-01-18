@@ -57,7 +57,7 @@ def plotAny(t, u, fig_title, spikes = False):
     
     plt.show()
     
-def plotIntegralAndEncoderOutput(t, y_signal, enc_output, enc_output_label, fig_title):
+def plotIntegralAndEncoderOutput(t, y_signal, enc_output, enc_output_label, fig_title, spikes = False):
     """
     Plot the integral signal and the spike signal (z(t) from Lazar's paper, q(t) from Feichtinger's paper)
     in the same plot.
@@ -75,7 +75,11 @@ def plotIntegralAndEncoderOutput(t, y_signal, enc_output, enc_output_label, fig_
     plt.figure(figsize=(12, 8))
         
     plt.plot(t, y_signal, 'r', label='y(t)')
-    plt.plot(t, enc_output, 'b', label=enc_output_label)
+    if spikes == True:
+        plt.stem(t, enc_output, 'b', label=enc_output_label)
+    else:
+        plt.plot(t, enc_output, 'b', label=enc_output_label)
+    
     plt.title(fig_title)
     plt.legend()
     

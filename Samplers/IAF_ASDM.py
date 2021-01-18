@@ -33,7 +33,7 @@ class IAF_ASDM(Sampler):
         self.status = Status.HAS_SIGNAL
         
     def integrate(self, y, sgn, i):
-        return y + self.dt * (sgn * self.bias + self.u[i]) / self.k_constant
+        return y + (self.dt * (sgn * self.bias + self.u[i]) / self.k_constant)
     
     def encode(self, initial_y = 0, initial_sgn = -1):
         if self.status < Status.HAS_SIGNAL:
@@ -54,7 +54,6 @@ class IAF_ASDM(Sampler):
             interval += self.dt
             
             z_signal.append(sgn * self.bias)
-            y_signal.append(y)
             
             if np.abs(y) >= self.threshold:
                 interval_lengths.append(interval)
@@ -62,6 +61,8 @@ class IAF_ASDM(Sampler):
                 y = self.threshold * sgn
                 sgn = - sgn
                 spikes_idx.append(i)
+                
+            y_signal.append(y)
 
                 
         self.interval_lengths = np.array(interval_lengths)
