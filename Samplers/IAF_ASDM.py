@@ -39,6 +39,17 @@ class IAF_ASDM(Sampler):
         
         self.status = Status.HAS_SIGNAL
         
+    def isRecoverable(self):
+        if self.status < Status.HAS_SIGNAL:
+            raise ValueError(f"The current status {self.status.name} doesn't allow the use of isRecoverable()")
+            
+        numer = 2 * self.k_constant * self.threshold * self.bw
+        denom = (self.bias - np.max(self.u)) * np.pi
+        
+        r = numer/denom
+        
+        return r <= 1
+        
     def integrate(self, y, sgn, i):
         return y + (self.dt * (sgn * self.bias + self.u[i]) / self.k_constant)
     

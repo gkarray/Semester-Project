@@ -112,7 +112,7 @@ class IAF_KernelBased(Sampler):
         # Wi
         # To be optimized
         ws = []
-        ws.append(self.w_0)
+        ws.append(np.random.normal(self.w_0, self.theta))
         for idx, value in enumerate(scaled_qs):
             tj = self.t[spikes_idx_with_t_0[idx]]
             tj1 = self.t[spikes_idx_with_t_0[idx+1]]
