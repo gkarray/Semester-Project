@@ -1,8 +1,9 @@
 from Sampler import Status, Sampler
-from helpers import getSpikesSignal, closedPhiFromRcos
+from helpers import getSpikesSignal, rcosFilter, getPhiFromPsi, closedPhiFromRcos
 from plots import plotSignalAndFourier, plotAny, plotSignalAndSpikes, plotSignalAndRecoveredSignal, plotIntegralAndEncoderOutput
 import numpy as np
 from scipy import special
+from scipy.fft import fft, fftfreq, irfft
 
 class IAF_KernelBased(Sampler):
     def __init__(self, alpha, theta, gamma, Ts):
@@ -34,26 +35,37 @@ class IAF_KernelBased(Sampler):
         self.dt = dt
         
         self.t_phi_kernel = np.arange(-self.t[-1]/2, self.t[-1]/2 + self.dt, self.dt)
+        if(self.t_phi_kernel.shape[0] > self.t.shape[0]):
+            self.t_phi_kernel = self.t_phi_kernel[:-1]
+        
+        self.psi_kernel = rcosFilter(self.t_phi_kernel, self.gamma, self.Ts)
         self.phi_kernel = closedPhiFromRcos(self.t_phi_kernel, self.gamma, self.Ts, self.alpha)
+        
+        u_fourier = fft(u)
+        ffreq = fftfreq(len(t), dt)
+        mult = 2 * np.pi * ffreq * 1j + self.alpha
+        v_fourier = u_fourier / mult
+        self.v = irfft(v_fourier, len(t))
+    
+        self.w_0 = self.v[0]
         
         self.status = Status.HAS_SIGNAL
         
-    def integrate(self, y, i, tj):
-        return y + self.dt * self.u[i] * np.exp((tj - self.t[i]) / self.alpha)
+    def integrate(self, y, i):
+        return y * (1 - self.alpha * self.dt) + self.u[i] * self.dt
     
-    def encode(self, initial_y = 0, initial_tj = 0):
+    def encode(self, initial_y = 0):
         if self.status < Status.HAS_SIGNAL:
             raise ValueError(f"The current status {self.status.name} doesn't allow the use of encode()")
         
-        y_signal = []
+        y = initial_y
+        
+        y_signal = [initial_y]
         spikes_idx = []
         q_signs = []
         
-        y = initial_y
-        tj = initial_tj
-        
         for i in range(len(self.u)):
-            y = self.integrate(y, i, tj)
+            y = self.integrate(y, i)
             y_signal.append(y)
             
             
@@ -65,6 +77,7 @@ class IAF_KernelBased(Sampler):
                 q_signs.append(np.sign(y))
                 y = 0
                 
+        y_signal.pop()
         self.y_signal = np.array(y_signal)
         self.spikes_idx = np.array(spikes_idx)
         self.q_signs = np.array(q_signs)
@@ -75,48 +88,64 @@ class IAF_KernelBased(Sampler):
         
         return self.spikes_signal
 
-    def decode(self, initial_sgn = 1):
+    def decode(self, gamma = None, Ts = None):
         if self.status < Status.ENCODED:
             raise ValueError(f"The current status {self.status.name} doesn't allow the use of decode()")
             
         if self.spikes_timings.shape[0] < 2:
             raise ValueError('Spikes signal contains less than 2 spikes')
             
+        if gamma != None and Ts != None :
+            self.gamma = gamma
+            self.Ts = Ts
+            
+            self.t_phi_kernel = np.arange(-self.t[-1]/2, self.t[-1]/2 + self.dt, self.dt)
+            if(self.t_phi_kernel.shape[0] > self.t.shape[0]):
+                self.t_phi_kernel = self.t_phi_kernel[:-1]
+            
+            self.psi_kernel = rcosFilter(self.t_phi_kernel, self.gamma, self.Ts)
+            self.phi_kernel = closedPhiFromRcos(self.t_phi_kernel, self.gamma, self.Ts, self.alpha)
+            
         scaled_qs = self.q_signs * self.theta
+        spikes_idx_with_t_0 = np.insert(self.spikes_idx, 0, 0)
 
         # Wi
         # To be optimized
         ws = []
-        ws.append(0)
+        ws.append(self.w_0)
         for idx, value in enumerate(scaled_qs):
-            if(idx == 0):
-                continue
-
-            w = np.exp(self.alpha * (self.t[int(self.spikes_idx[idx-1])] - self.t[int(self.spikes_idx[idx])])) * ws[idx-1] + value
-            ws.append(w)
+            tj = self.t[spikes_idx_with_t_0[idx]]
+            tj1 = self.t[spikes_idx_with_t_0[idx+1]]
+            wj = ws[idx]
+            qj1 = value
+            
+            wj1 = np.exp(self.alpha * (tj - tj1)) * wj + qj1
+            ws.append(wj1)
+            
+        self.ws = ws
 
         # Sk
         # To be optimized
         sk = []
         nb = 0
+        
         for idx, value in enumerate(self.t):
-            if(nb == 0):
-                s = 0
-            else:
-                s = np.exp(self.alpha * (self.t[int(self.spikes_idx[nb])] - value)) * ws[nb]
-
-            if(nb + 1 < self.spikes_idx.shape[0]):
-                if(idx == int(self.spikes_idx[nb+1])):
+            if(nb + 1< self.spikes_idx.shape[0]):
+                if(idx == int(spikes_idx_with_t_0[nb+1])):
                     nb = nb+1
+            
+            s = np.exp(self.alpha * (self.t[spikes_idx_with_t_0[nb]] - value)) * ws[nb]
 
             sk.append(s)
+            
+        self.sk = np.array(sk)
 
         # Applying the right filter
         # To be optimized
-        convolved = np.convolve(self.phi_kernel, sk)
-        filtered = convolved[int(self.t.shape[0] / 2): - int(self.t.shape[0] / 2) + 1]
+        convolved = np.convolve(self.phi_kernel, sk, mode='same')
+        self.u_rec = convolved
             
-        self.u_rec = filtered
+#         self.u_rec = filtered
         
         self.status = Status.DECODED
         
@@ -216,6 +245,14 @@ class IAF_KernelBased(Sampler):
         fig_title = 'Output of the integrator / Output of the encoder'    
         
         plotIntegralAndEncoderOutput(self.t, self.y_signal, self.spikes_signal, 'q(t)', fig_title, spikes = True)
+        
+    def plotPsiKernel(self):
+        if self.status < Status.HAS_SIGNAL:
+            raise ValueError(f"The current status {self.status.name} doesn't allow the use of plotPhiKernel()")
+            
+        fig_title = 'Psi kernel'
+        
+        plotSignalAndFourier(self.t_phi_kernel, self.psi_kernel, self.dt, fig_title)
         
     def plotPhiKernel(self):
         if self.status < Status.HAS_SIGNAL:

@@ -75,7 +75,7 @@ class IAF_FRI(Sampler):
         
         return self.spikes_signal
 
-    def decode(self, initial_sgn = 1):
+    def decode(self):
         if self.status < Status.ENCODED:
             raise ValueError(f"The current status {self.status.name} doesn't allow the use of decode()")
             

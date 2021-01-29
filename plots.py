@@ -34,7 +34,7 @@ def plotSignalAndFourier(t, u, dt, fig_title):
     plt.grid()
 
     plt.subplot(1, 2, 2)
-    plt.plot(xf, 1.0/len(t) * np.abs(yplot))
+    plt.plot(xf, (2.0/len(t)) * np.abs(yplot))
     plt.xlabel('f (Hz)')
     plt.ylabel('|U(f)|')
     plt.grid()
@@ -44,10 +44,10 @@ def plotSignalAndFourier(t, u, dt, fig_title):
     plt.show()
     
 def plotAny(t, u, fig_title, spikes = False):
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(15, 10))
     
     if spikes:
-        plt.stem(t, u)
+        plt.stem(t, u, use_line_collection = True)
     else:
         plt.plot(t, u)
     plt.xlabel('t (s)')
@@ -72,11 +72,11 @@ def plotIntegralAndEncoderOutput(t, y_signal, enc_output, enc_output_label, fig_
         Spike signal.
 
     """
-    plt.figure(figsize=(12, 8))
+    plt.figure(figsize=(15, 10))
         
     plt.plot(t, y_signal, 'r', label='y(t)')
     if spikes == True:
-        plt.stem(t, enc_output, 'b', label=enc_output_label)
+        plt.stem(t, enc_output, 'b', label=enc_output_label, use_line_collection = True)
     else:
         plt.plot(t, enc_output, 'b', label=enc_output_label)
     
@@ -121,7 +121,7 @@ def plotSignalAndSpikes(t, u, s, fig_title):
     p.gca().set_xlim(min(t), max(t))
     p.draw_if_interactive()
 
-def plotSignalAndRecoveredSignal(t, u, v, fig_title):
+def plotSignalAndRecoveredSignal(t, u, v, fig_title, spikes = False, denoised = None):
     """
     Compare two signals and plot the difference between them.
 
@@ -138,16 +138,45 @@ def plotSignalAndRecoveredSignal(t, u, v, fig_title):
     p.gcf().canvas.set_window_title(fig_title)
 #     p.subplot(211)
     p.plot(t, u, 'b', label='u(t)')
-    p.plot(t, v, 'r', label='u_rec(t)')
+    if(spikes):
+        p.stem(t, v, 'r', label='u_rec(t)', use_line_collection = True)
+    else:
+        p.plot(t, v, 'r', label='u_rec(t)')
+        
+    if(denoised != None):
+        p.plot(t, denoised, 'o', label='denoised u(t)')
+    
     p.xlabel('t (s)')
     p.ylabel('u(t)')
     p.legend()
     p.title(fig_title)
     p.gca().set_xlim(min(t), max(t))
-#     p.subplot(212)
-#     p.plot(t, 20*np.log10(abs(u-v)))
-#     p.xlabel('t (s)')
-#     p.ylabel('error (dB)')
-#     p.gca().set_xlim(min(t), max(t))
+    p.draw_if_interactive()
+    
+def plotSignalAndRecoveredSignalAndDenoised(t, u, v, denoised, fig_title):
+    """
+    Compare two signals and plot the difference between them.
+
+    Parameters
+    ----------
+    t : ndarray of floats
+        Times (s) at which the signal is defined.
+    u, v : ndarrays of floats
+        Signal samples.
+
+    """
+    p.figure(figsize=(15, 10))
+    p.clf()
+    p.gcf().canvas.set_window_title(fig_title)
+    p.plot(t, u, 'b', label='u(t)')
+    p.plot(t, v, 'r', label='u_rec(t)')
+        
+    p.plot(t, denoised, 'g', label='denoised u(t)')
+    
+    p.xlabel('t (s)')
+    p.ylabel('u(t)')
+    p.legend()
+    p.title(fig_title)
+    p.gca().set_xlim(min(t), max(t))
     p.draw_if_interactive()
     

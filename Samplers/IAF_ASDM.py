@@ -1,6 +1,6 @@
 from Sampler import Status, Sampler
-from helpers import getSpikesSignal
-from plots import plotSignalAndFourier, plotAny, plotSignalAndSpikes, plotSignalAndRecoveredSignal, plotIntegralAndEncoderOutput
+from helpers import getSpikesSignal, addNoise
+from plots import plotSignalAndFourier, plotAny, plotSignalAndSpikes, plotSignalAndRecoveredSignal, plotIntegralAndEncoderOutput, plotSignalAndRecoveredSignalAndDenoised
 import numpy as np
 from scipy import special
 
@@ -25,17 +25,24 @@ class IAF_ASDM(Sampler):
             
         self.k_constant = k_constant
         
-    def setSignal(self, t, u, dt, bw):
+    def setSignal(self, t, u, dt, bw, varNoise = None):
         self.t = t
         self.u = u
         self.dt = dt
         self.bw = bw
+        
+        self.varNoise = varNoise
+        
+        if(self.varNoise != None):
+            self.original = u
+            self.u = addNoise(u, varNoise)
+        
         self.status = Status.HAS_SIGNAL
         
     def integrate(self, y, sgn, i):
         return y + (self.dt * (sgn * self.bias + self.u[i]) / self.k_constant)
     
-    def encode(self, initial_y = 0, initial_sgn = -1):
+    def encode(self, initial_sgn = -1):
         if self.status < Status.HAS_SIGNAL:
             raise ValueError(f"The current status {self.status.name} doesn't allow the use of encode()")
         
@@ -45,7 +52,8 @@ class IAF_ASDM(Sampler):
         spikes_idx = []
         
         interval = 0
-        y = initial_y
+        y = initial_sgn * self.threshold
+#         y = 0
         sgn = initial_sgn
         
         for i in range(len(self.u)):
@@ -127,7 +135,7 @@ class IAF_ASDM(Sampler):
         print(80 * f'=')
         print(f'Integrate-and-Fire Sampler - ASDM')
         print(f'From "TIME ENCODING AND PERFECT RECOVERY OF BANDLIMITED SIGNALS"')
-        print(f'Aurel A. Lazar, Laszlo T. Toth, 2004')
+        print(f'Aurel A. Lazar, Laszlo T. Toth, 2003')
         print(f'Status: {self.status.name}')
         print(f'Parameters:')
         print(f"Bias 'b': {self.bias}")
@@ -180,15 +188,25 @@ class IAF_ASDM(Sampler):
         if self.status < Status.DECODED:
             raise ValueError(f"The current status {self.status.name} doesn't allow the use of plotSignalAndRecoveredSignal()")
         
-        fig_title = 'Comparaison of original signal and recovered signal encoded then decoded with an Integrate-and-Fire - ASDM sampler (with spikes)'
+        fig_title = 'Comparaison of original signal and recovered signal encoded then decoded with an Integrate-and-Fire - ASDM sampler'
         
-        plotSignalAndRecoveredSignal(self.t, self.u, self.u_rec, fig_title)
+        if(self.varNoise != None):
+            plotSignalAndRecoveredSignalAndDenoised(self.t, self.u, self.u_rec,self.original, fig_title)
+        else:
+            plotSignalAndRecoveredSignal(self.t, self.u, self.u_rec, fig_title)
+            
+        
         
     def computeError(self):
         if self.status < Status.DECODED:
             raise ValueError(f"The current status {self.status.name} doesn't allow the use of computeError()")
         
-        return self.u - self.u_rec
+        if(self.varNoise != None):
+            sig = self.original
+        else:
+            sig = self.u
+        
+        return sig - self.u_rec
     
     def computeMeanSquaredError(self):
         if self.status < Status.DECODED:

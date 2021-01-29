@@ -1,5 +1,6 @@
 from Generator import Generator
-from numpy import ceil, zeros, array, exp, pi
+from numpy import ceil, zeros, array, exp, pi, sqrt
+import numpy as np
 from numpy.random import randint, rand
 from numpy.fft import irfft
 
@@ -33,7 +34,7 @@ class BL(Generator):
         
         self.min_diff = min_diff
         
-    def generate(self):
+    def generate(self, normalized = False):
         fs = 1.0/self.dt
         
         N = int(ceil(self.dur/self.dt))
@@ -71,5 +72,9 @@ class BL(Generator):
         f[ci] = (N/2)*exp(1j*p)
         
         u = irfft(f,N)
+        
+        if normalized :
+            sum_squares = np.sum(u**2)
+            u = u / sqrt(sum_squares/N)
         
         return self.t, u
